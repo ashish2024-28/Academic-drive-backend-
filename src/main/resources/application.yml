@@ -7,7 +7,7 @@ server:
         name: ACADEMICDRIVE_SESSION
         http-only: true
         secure: ${COOKIE_SECURE:true}
-        same-site: ${COOKIE_SAME_SITE:Lax}
+        same-site: ${COOKIE_SAME_SITE:None}
         path: /
 
 management:
@@ -33,7 +33,7 @@ spring:
         name: ACADEMICDRIVE_SESSION
         http-only: true
         secure: ${COOKIE_SECURE:true}
-        same-site: ${COOKIE_SAME_SITE:Lax}
+        same-site: ${COOKIE_SAME_SITE:None}
         path: /
   data:
     mongodb:
