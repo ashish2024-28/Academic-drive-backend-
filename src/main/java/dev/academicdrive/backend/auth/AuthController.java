@@ -3,6 +3,7 @@ package dev.academicdrive.backend.auth;
 import dev.academicdrive.backend.drive.GoogleDriveConnectionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -33,9 +34,12 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public GoogleUserProfile currentUser(@AuthenticationPrincipal OidcUser user) {
+    public ResponseEntity<GoogleUserProfile> currentUser(@AuthenticationPrincipal OidcUser user) {
+        if (user == null) {
+            return ResponseEntity.noContent().build();
+        }
         GoogleUserDocument account = findAccount(user);
-        return GoogleUserProfile.from(user, account);
+        return ResponseEntity.ok(GoogleUserProfile.from(user, account));
     }
 
     @PatchMapping("/profile")

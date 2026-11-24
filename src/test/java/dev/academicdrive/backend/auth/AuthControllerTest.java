@@ -4,16 +4,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dev.academicdrive.backend.drive.GoogleDriveConnectionService;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 class AuthControllerTest {
+    @Test
+    void returnsNoContentWhenNoUserIsSignedIn() {
+        GoogleUserRepository users = mock(GoogleUserRepository.class);
+        GoogleDriveConnectionService driveConnections = mock(GoogleDriveConnectionService.class);
+        AuthController controller = new AuthController(users, driveConnections);
+
+        var response = controller.currentUser(null);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verifyNoInteractions(users, driveConnections);
+    }
+
     @Test
     void savesCollegeNameAndReturnsPersistentProfileDetails() {
         GoogleUserRepository users = mock(GoogleUserRepository.class);

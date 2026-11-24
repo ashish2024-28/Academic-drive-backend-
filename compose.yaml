@@ -5,13 +5,13 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      APP_FRONTEND_ORIGIN: http://localhost:3000
+      APP_FRONTEND_ORIGIN: ${APP_FRONTEND_ORIGIN:-http://localhost:3000}
       COOKIE_SECURE: "false"
       COOKIE_SAME_SITE: Lax
       CSRF_COOKIE_DOMAIN: ""
-      PORT: "8080"
+      PORT: ${PORT:-8080}
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${PORT:-8080}:${PORT:-8080}"
     restart: unless-stopped
 
   frontend:
