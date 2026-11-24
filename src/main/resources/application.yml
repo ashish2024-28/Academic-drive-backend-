@@ -37,7 +37,7 @@ spring:
         path: /
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/academic_drive}
+      uri: ${MONGODB_URI}
       auto-index-creation: true
   security:
     oauth2:
@@ -69,16 +69,8 @@ spring:
         provider:
           google:
             issuer-uri: ${GOOGLE_ISSUER_URI:https://accounts.google.com}
-  ai:
-    google:
-      genai:
-        api-key: ${GOOGLE_AI_API_KEY}
-        chat:
-          options:
-            model: ${GOOGLE_AI_MODEL:gemini-2.5-flash}
-
 app:
-  frontend-origin: ${APP_FRONTEND_ORIGIN:http://localhost:3000}
+  frontend-origin: ${APP_FRONTEND_ORIGIN}
   csrf-cookie-domain: ${CSRF_COOKIE_DOMAIN:}
   google:
     api-base-url: ${GOOGLE_API_BASE_URL:https://www.googleapis.com}

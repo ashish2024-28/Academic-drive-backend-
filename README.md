@@ -1,6 +1,6 @@
 # Academic Drive – College Study Material Manager
 
-Academic Drive is an offline-first React PWA for organizing college study materials, with a Spring Boot API for Google sign-in, Google Drive operations, and authenticated AI chat.
+Academic Drive is an offline-first React PWA for organizing college study materials, with a Spring Boot API for Google sign-in and Google Drive operations.
 
 ## Repository layout
 
@@ -13,7 +13,7 @@ Academic Drive is an offline-first React PWA for organizing college study materi
 
 ## Local development
 
-1. Use Node.js 22.12+ and Java 21. Copy `backend/.env.example` to `backend/.env` and set the MongoDB URI, OAuth credentials, AI key, and token-encryption key. Keep private values out of all `VITE_` variables.
+1. Use Node.js 22.12+ and Java 21. Copy `.env.example` to `.env` and set the MongoDB URI, Google sign-in/Drive OAuth credentials, and token-encryption key.
 2. Copy `frontend/.env.example` to `frontend/.env` and set the API URL and restricted, browser-visible Google Picker settings.
 3. Configure the Google OAuth web client with `http://localhost:3000` as an authorized JavaScript origin and these redirect URIs:
    - `http://localhost:8080/login/oauth2/code/google`

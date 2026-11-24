@@ -12,6 +12,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
@@ -37,7 +38,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Configuration
 public class SecurityConfig {
-
     private List<String> parseFrontendOrigins(String frontendOrigins) {
         return Arrays.stream(frontendOrigins.split(","))
                 .map(String::trim)
@@ -109,7 +109,6 @@ public class SecurityConfig {
                                 userInfo.oidcUserService(oidcUserService)
                         )
                         .successHandler((request, response, authentication) -> {
-
                             if (authentication instanceof OAuth2AuthenticationToken oauthToken
                                     && EncryptedAuthorizedClientService.GOOGLE_DRIVE_REGISTRATION_ID
                                     .equals(oauthToken.getAuthorizedClientRegistrationId())) {
@@ -136,7 +135,9 @@ public class SecurityConfig {
 
                             response.sendRedirect(frontendOrigin + "?auth=success");
                         })
-                        .failureUrl(frontendOrigin + "?auth=failed")
+                        .failureHandler((request, response, exception) -> {
+                            response.sendRedirect(frontendOrigin + "?auth=failed");
+                        })
                 )
 
                 .logout(logout -> logout
@@ -187,6 +188,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Primary
     OAuth2AuthorizedClientManager authorizedClientManager(
             ClientRegistrationRepository registrations,
             OAuth2AuthorizedClientService authorizedClientService
@@ -219,4 +221,5 @@ public class SecurityConfig {
 
         return manager;
     }
+
 }

@@ -24,8 +24,8 @@ public class GoogleAuthorizationRequestResolver implements OAuth2AuthorizationRe
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
         String path = request.getRequestURI();
-        boolean driveAuthorization = path.endsWith("/google-drive");
-        return addOfflineAccess(delegate.resolve(request), driveAuthorization);
+        boolean offlineAuthorization = path.endsWith("/google-drive");
+        return addOfflineAccess(delegate.resolve(request), offlineAuthorization);
     }
 
     @Override
@@ -36,8 +36,8 @@ public class GoogleAuthorizationRequestResolver implements OAuth2AuthorizationRe
     }
 
     private OAuth2AuthorizationRequest addOfflineAccess(
-            OAuth2AuthorizationRequest authorizationRequest, boolean driveAuthorization) {
-        if (authorizationRequest == null || !driveAuthorization) {
+            OAuth2AuthorizationRequest authorizationRequest, boolean offlineAuthorization) {
+        if (authorizationRequest == null || !offlineAuthorization) {
             return authorizationRequest;
         }
         Map<String, Object> parameters = new HashMap<>(authorizationRequest.getAdditionalParameters());

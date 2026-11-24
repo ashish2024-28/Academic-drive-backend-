@@ -34,7 +34,7 @@ public class EncryptedAuthorizedClientService implements OAuth2AuthorizedClientS
     @SuppressWarnings("unchecked")
     public <T extends OAuth2AuthorizedClient> T loadAuthorizedClient(
             String clientRegistrationId, String principalName) {
-        if (!GOOGLE_DRIVE_REGISTRATION_ID.equals(clientRegistrationId)) {
+        if (!isSupportedRegistration(clientRegistrationId)) {
             return null;
         }
         return authorizedClients
@@ -46,7 +46,7 @@ public class EncryptedAuthorizedClientService implements OAuth2AuthorizedClientS
 
     @Override
     public void saveAuthorizedClient(OAuth2AuthorizedClient client, Authentication principal) {
-        if (!GOOGLE_DRIVE_REGISTRATION_ID.equals(client.getClientRegistration().getRegistrationId())) {
+        if (!isSupportedRegistration(client.getClientRegistration().getRegistrationId())) {
             return;
         }
         String principalName = principal.getName();
@@ -75,11 +75,15 @@ public class EncryptedAuthorizedClientService implements OAuth2AuthorizedClientS
 
     @Override
     public void removeAuthorizedClient(String clientRegistrationId, String principalName) {
-        if (!GOOGLE_DRIVE_REGISTRATION_ID.equals(clientRegistrationId)) {
+        if (!isSupportedRegistration(clientRegistrationId)) {
             return;
         }
         authorizedClients.deleteByClientRegistrationIdAndPrincipalName(
                 clientRegistrationId, principalName);
+    }
+
+    private static boolean isSupportedRegistration(String clientRegistrationId) {
+        return GOOGLE_DRIVE_REGISTRATION_ID.equals(clientRegistrationId);
     }
 
     private OAuth2AuthorizedClient rehydrate(
