@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_FRONTEND_ORIGIN: http://localhost:3000
+      COOKIE_SECURE: "false"
+      COOKIE_SAME_SITE: Lax
+      CSRF_COOKIE_DOMAIN: ""
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_GOOGLE_API_KEY: ${VITE_GOOGLE_API_KEY:-}
+        VITE_GOOGLE_PROJECT_NUMBER: ${VITE_GOOGLE_PROJECT_NUMBER:-}
+        VITE_LEARNING_ACCESS_CODE: ${VITE_LEARNING_ACCESS_CODE:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:8080"
+    restart: unless-stopped
