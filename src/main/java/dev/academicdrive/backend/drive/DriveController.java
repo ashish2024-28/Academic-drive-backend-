@@ -65,6 +65,11 @@ public class DriveController {
         return toResponse(driveApiService.listFiles(authentication, query));
     }
 
+    @GetMapping("/about")
+    public ResponseEntity<byte[]> about(Authentication authentication) {
+        return toResponse(driveApiService.getAbout(authentication));
+    }
+
     @PostMapping("/files")
     public ResponseEntity<byte[]> createFile(
             Authentication authentication,

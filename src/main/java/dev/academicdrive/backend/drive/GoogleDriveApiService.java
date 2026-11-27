@@ -53,6 +53,12 @@ public class GoogleDriveApiService {
         return execute(googleApi, authentication, HttpMethod.GET, "/drive/v3/files", query, null, null);
     }
 
+    public DriveApiResponse getAbout(Authentication authentication) {
+        MultiValueMap<String, String> query = new LinkedMultiValueMap<>();
+        query.add("fields", "storageQuota(limit,usage,usageInDrive,usageInDriveTrash)");
+        return execute(googleApi, authentication, HttpMethod.GET, "/drive/v3/about", query, null, null);
+    }
+
     public DriveApiResponse createFile(
             Authentication authentication, byte[] body, MediaType contentType) {
         return execute(

@@ -27,6 +27,44 @@ import org.springframework.web.server.ResponseStatusException;
 
 class GoogleDriveApiServiceTest {
     @Test
+    void fetchesDriveStorageQuotaUsingTheServerAuthorizedClient() {
+        OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GoogleDriveApiService service =
+                new GoogleDriveApiService(manager, builder, "https://www.googleapis.com");
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                "server-only-token",
+                Instant.now(),
+                Instant.now().plusSeconds(3600));
+        ClientRegistration registration = ClientRegistration.withRegistrationId("google-drive")
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .clientName("Google")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri("https://accounts.google.com/o/oauth2/v2/auth")
+                .tokenUri("https://oauth2.googleapis.com/token")
+                .scope("openid", "email", "profile", "https://www.googleapis.com/auth/drive.file")
+                .build();
+        when(manager.authorize(any())).thenReturn(
+                new OAuth2AuthorizedClient(registration, "google-subject", accessToken));
+
+        server.expect(requestTo("https://www.googleapis.com/drive/v3/about?fields=storageQuota(limit,usage,usageInDrive,usageInDriveTrash)"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer server-only-token"))
+                .andRespond(withSuccess("{\"storageQuota\":{\"usage\":\"100\",\"limit\":\"1000\"}}", MediaType.APPLICATION_JSON));
+
+        DriveApiResponse response = service.getAbout(
+                new TestingAuthenticationToken("google-subject", null, "ROLE_USER"));
+
+        server.verify();
+        assertEquals(200, response.status());
+        assertEquals("{\"storageQuota\":{\"usage\":\"100\",\"limit\":\"1000\"}}", new String(response.body()));
+    }
+
+    @Test
     void proxiesDriveRequestsUsingTheServerAuthorizedClient() {
         OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
         RestClient.Builder builder = RestClient.builder();
