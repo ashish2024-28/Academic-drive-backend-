@@ -10,6 +10,10 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.sun.net.httpserver.HttpServer;
+import java.io.ByteArrayInputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -21,6 +25,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
@@ -116,5 +121,71 @@ class GoogleDriveApiServiceTest {
         assertThrows(ResponseStatusException.class, () -> service.listFiles(
                 new TestingAuthenticationToken("google-subject", null, "ROLE_USER"),
                 query));
+    }
+
+    @Test
+    void streamsFileContentToDriveWithoutBufferingTheRequestBody() throws Exception {
+        OAuth2AuthorizedClientManager manager = mock(OAuth2AuthorizedClientManager.class);
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                "server-only-token",
+                Instant.now(),
+                Instant.now().plusSeconds(3600));
+        ClientRegistration registration = ClientRegistration.withRegistrationId("google-drive")
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .clientName("Google")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri("https://accounts.google.com/o/oauth2/v2/auth")
+                .tokenUri("https://oauth2.googleapis.com/token")
+                .scope("openid", "email", "profile", "https://www.googleapis.com/auth/drive.file")
+                .build();
+        when(manager.authorize(any())).thenReturn(
+                new OAuth2AuthorizedClient(registration, "google-subject", accessToken));
+
+        byte[] fileContent = "streamed Drive content".getBytes(StandardCharsets.UTF_8);
+        var receivedContent = new java.util.concurrent.atomic.AtomicReference<byte[]>();
+        var receivedMethod = new java.util.concurrent.atomic.AtomicReference<String>();
+        var receivedQuery = new java.util.concurrent.atomic.AtomicReference<String>();
+        var receivedAuthorization = new java.util.concurrent.atomic.AtomicReference<String>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/upload/drive/v3/files/file-id", exchange -> {
+            receivedMethod.set(exchange.getRequestMethod());
+            receivedQuery.set(exchange.getRequestURI().getQuery());
+            receivedAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            receivedContent.set(exchange.getRequestBody().readAllBytes());
+            byte[] responseBody = "{\"id\":\"file-id\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", MediaType.APPLICATION_JSON_VALUE);
+            exchange.sendResponseHeaders(200, responseBody.length);
+            try (var output = exchange.getResponseBody()) {
+                output.write(responseBody);
+            }
+        });
+        server.start();
+
+        try {
+            RestClient.Builder builder = RestClient.builder()
+                    .requestFactory(new JdkClientHttpRequestFactory());
+            GoogleDriveApiService service = new GoogleDriveApiService(
+                    manager, builder, "http://127.0.0.1:" + server.getAddress().getPort());
+
+            DriveApiResponse response = service.updateFileContent(
+                    new TestingAuthenticationToken("google-subject", null, "ROLE_USER"),
+                    "file-id",
+                    new ByteArrayInputStream(fileContent),
+                    fileContent.length,
+                    MediaType.APPLICATION_OCTET_STREAM);
+
+            assertEquals(200, response.status());
+            assertEquals("{\"id\":\"file-id\"}", new String(response.body(), StandardCharsets.UTF_8));
+            assertEquals("PATCH", receivedMethod.get());
+            assertEquals("uploadType=media", receivedQuery.get());
+            assertEquals("Bearer server-only-token", receivedAuthorization.get());
+            assertEquals(new String(fileContent, StandardCharsets.UTF_8),
+                    new String(receivedContent.get(), StandardCharsets.UTF_8));
+        } finally {
+            server.stop(0);
+        }
     }
 }

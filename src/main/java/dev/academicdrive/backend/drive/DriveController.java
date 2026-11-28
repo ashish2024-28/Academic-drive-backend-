@@ -1,6 +1,11 @@
 package dev.academicdrive.backend.drive;
 
+import java.io.IOException;
 import java.net.URI;
+import java.util.Optional;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,12 +30,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class DriveController {
     private final GoogleDriveConnectionService driveConnectionService;
     private final GoogleDriveApiService driveApiService;
+    private final DriveSyncLockService driveSyncLockService;
 
     public DriveController(
             GoogleDriveConnectionService driveConnectionService,
-            GoogleDriveApiService driveApiService) {
+            GoogleDriveApiService driveApiService,
+            DriveSyncLockService driveSyncLockService) {
         this.driveConnectionService = driveConnectionService;
         this.driveApiService = driveApiService;
+        this.driveSyncLockService = driveSyncLockService;
     }
 
     @GetMapping("/connect")
@@ -55,6 +63,33 @@ public class DriveController {
     @PostMapping("/disconnect")
     public ResponseEntity<Void> disconnect(Authentication authentication) {
         driveConnectionService.disconnect(authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sync-lock")
+    public ResponseEntity<SyncLockResponse> acquireSyncLock(Authentication authentication) {
+        Optional<String> token = driveSyncLockService.tryAcquire(authentication.getName());
+        if (token.isPresent()) {
+            return ResponseEntity.ok(new SyncLockResponse(true, token.get(), 0));
+        }
+        return ResponseEntity.accepted()
+                .header(HttpHeaders.RETRY_AFTER, "1")
+                .body(new SyncLockResponse(false, null, 1_000));
+    }
+
+    @PostMapping("/sync-lock/renew")
+    public ResponseEntity<Void> renewSyncLock(
+            Authentication authentication,
+            @Valid @RequestBody SyncLockRequest request) {
+        driveSyncLockService.renew(authentication.getName(), request.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sync-lock/release")
+    public ResponseEntity<Void> releaseSyncLock(
+            Authentication authentication,
+            @Valid @RequestBody SyncLockRequest request) {
+        driveSyncLockService.release(authentication.getName(), request.token());
         return ResponseEntity.noContent().build();
     }
 
@@ -126,10 +161,10 @@ public class DriveController {
     public ResponseEntity<byte[]> updateFileContent(
             Authentication authentication,
             @PathVariable String fileId,
-            @RequestBody byte[] body,
-            @RequestHeader(value = HttpHeaders.CONTENT_TYPE, required = false) MediaType contentType) {
+            @RequestHeader(value = HttpHeaders.CONTENT_TYPE, required = false) MediaType contentType,
+            HttpServletRequest request) throws IOException {
         return toResponse(driveApiService.updateFileContent(
-                authentication, fileId, body, contentType));
+                authentication, fileId, request.getInputStream(), request.getContentLengthLong(), contentType));
     }
 
     private static ResponseEntity<byte[]> toResponse(DriveApiResponse response) {
@@ -139,4 +174,6 @@ public class DriveController {
     }
 
     public record PickerTokenResponse(String accessToken) {}
+    public record SyncLockResponse(boolean acquired, String token, long retryAfterMs) {}
+    public record SyncLockRequest(@NotBlank String token) {}
 }

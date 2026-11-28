@@ -1,13 +1,15 @@
 package dev.academicdrive.backend.drive;
 
 import dev.academicdrive.backend.security.EncryptedAuthorizedClientService;
+import java.io.InputStream;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.StreamingHttpOutputMessage;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -147,18 +149,32 @@ public class GoogleDriveApiService {
     public DriveApiResponse updateFileContent(
             Authentication authentication,
             String fileId,
-            byte[] body,
+            InputStream body,
+            long contentLength,
             MediaType contentType) {
         MultiValueMap<String, String> query = new LinkedMultiValueMap<>();
         query.add("uploadType", "media");
-        return execute(
-                googleUploadApi,
-                authentication,
-                HttpMethod.PATCH,
-                driveFilePath(fileId).replace("/drive/v3", "/upload/drive/v3"),
-                query,
-                body,
-                contentType);
+        OAuth2AuthorizedClient client = getAuthorizedClient(authentication);
+        validateQuery(query);
+        RestClient.RequestBodySpec request = googleUploadApi.method(HttpMethod.PATCH)
+                .uri(uriBuilder -> uriBuilder
+                        .path(driveFilePath(fileId).replace("/drive/v3", "/upload/drive/v3"))
+                        .queryParams(query)
+                        .build())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + client.getAccessToken().getTokenValue())
+                .contentType(contentType == null ? MediaType.APPLICATION_OCTET_STREAM : contentType);
+        if (contentLength >= 0) request.contentLength(contentLength);
+
+        ResponseEntity<byte[]> response = request.body((StreamingHttpOutputMessage.Body) output -> {
+            try (body) {
+                body.transferTo(output);
+            }
+        }).retrieve().toEntity(byte[].class);
+        MediaType responseContentType = response.getHeaders().getContentType();
+        return new DriveApiResponse(
+                response.getStatusCode().value(),
+                responseContentType == null ? MediaType.APPLICATION_JSON : responseContentType,
+                response.getBody() == null ? new byte[0] : response.getBody());
     }
 
     public String pickerAccessToken(Authentication authentication) {
@@ -182,16 +198,7 @@ public class GoogleDriveApiService {
             MultiValueMap<String, String> query,
             byte[] body,
             MediaType contentType) {
-        OAuth2AuthorizedClient client = authorizedClientManager.authorize(
-                OAuth2AuthorizeRequest.withClientRegistrationId(
-                                EncryptedAuthorizedClientService.GOOGLE_DRIVE_REGISTRATION_ID)
-                        .principal(authentication)
-                        .build());
-        if (client == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.PRECONDITION_REQUIRED, "Connect Google Drive before using Drive files.");
-        }
-
+        OAuth2AuthorizedClient client = getAuthorizedClient(authentication);
         validateQuery(query);
         RestClient.RequestBodySpec request = api.method(method)
                 .uri(uriBuilder -> {
@@ -211,6 +218,19 @@ public class GoogleDriveApiService {
                 response.getStatusCode().value(),
                 responseContentType == null ? MediaType.APPLICATION_JSON : responseContentType,
                 response.getBody() == null ? new byte[0] : response.getBody());
+    }
+
+    private OAuth2AuthorizedClient getAuthorizedClient(Authentication authentication) {
+        OAuth2AuthorizedClient client = authorizedClientManager.authorize(
+                OAuth2AuthorizeRequest.withClientRegistrationId(
+                                EncryptedAuthorizedClientService.GOOGLE_DRIVE_REGISTRATION_ID)
+                        .principal(authentication)
+                        .build());
+        if (client == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.PRECONDITION_REQUIRED, "Connect Google Drive before using Drive files.");
+        }
+        return client;
     }
 
     private static void validateQuery(MultiValueMap<String, String> query) {
